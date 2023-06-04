@@ -2,13 +2,14 @@ import os
 from os.path import isdir, join
 from threading import Lock, Thread
 
+from condition_variables.wait_group import WaitGroup
+
 mutex = Lock()
 matches = []
 
 
-def file_search(root, filename):
+def file_search(root, filename, wait_group):
     print("Searching in:", root)
-    child_threads = []
     for file in os.listdir(root):
         full_path = join(root, file)
         if filename in file:
@@ -16,17 +17,18 @@ def file_search(root, filename):
             matches.append(full_path)
             mutex.release()
         if isdir(full_path):
-            t = Thread(target=file_search, args=([full_path, filename]))
+            wait_group.add(1)
+            t = Thread(target=file_search, args=([full_path, filename, wait_group]))
             t.start()
-            child_threads.append(t)
-    for t in child_threads:
-        t.join()
+    wait_group.done()
 
 
 def main():
-    t = Thread(target=file_search, args=(["c:/tools", "README.md"]))
+    wait_group = WaitGroup()
+    wait_group.add(1)
+    t = Thread(target=file_search, args=(["c:/tools", "README.md", wait_group]))
     t.start()
-    t.join()
+    wait_group.wait()
     for m in matches:
         print("Matched:", m)
 
